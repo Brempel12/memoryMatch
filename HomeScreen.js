@@ -8,7 +8,6 @@ const HomeScreen = ({ onNavigate }) => {
             <Pressable style={[styles.button, styles.play]} onPress={() => onNavigate('Game')}>
                 <Text>Play Game</Text>
             </Pressable>
-            {/* Placeholder buttons for future screens */}
             <Pressable style={[styles.button, styles.instructions]} onPress={() => onNavigate('Instructions')}>
                 <Text>Instructions</Text>
             </Pressable>

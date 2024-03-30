@@ -1,13 +1,16 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, Text, Pressable, Alert, Vibration } from 'react-native';
 import { Audio } from 'expo-av';
+import * as SQLite from 'expo-sqlite';
 
-// Define emojis for the game
+const db = SQLite.openDatabase('memory_game.db');
+
+//emojis for game
 const emojis = ["🍎", "🚀", "🏰", "👻", "🧩", "🎩", "🐲", "🔮", "🎨", "🛸"];
-const doubledEmojis = [...emojis, ...emojis]; // Double the set for pairs
+const doubledEmojis = [...emojis, ...emojis];
 
+//shuffle array elements
 const shuffleArray = (array) => {
-    // Shuffle array elements
     for (let i = array.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [array[i], array[j]] = [array[j], array[i]];
@@ -22,13 +25,9 @@ const MemoryGame = ({ onNavigate }) => {
     const [moveCount, setMoveCount] = useState(0);
     const [gameTime, setGameTime] = useState(0);
     const [gameStarted, setGameStarted] = useState(false);
+    const [username, setUsername] = useState('');
 
-    // Sound effects
-    const playSound = async (soundPath) => {
-        const { sound } = await Audio.Sound.createAsync(soundPath);
-        await sound.playAsync();
-    };
-
+    // Effect for game timer
     useEffect(() => {
         let interval;
         if (gameStarted) {
@@ -42,20 +41,61 @@ const MemoryGame = ({ onNavigate }) => {
         return () => clearInterval(interval);
     }, [gameStarted]);
 
+    // Function to play sound effects
+    const playSound = async (soundPath) => {
+        const { sound } = await Audio.Sound.createAsync(soundPath);
+        await sound.playAsync();
+    };
+
+    // Function to save the score to database
+    const saveScore = (username) => {
+        db.transaction(tx => {
+            tx.executeSql(
+                `INSERT INTO scores (username, moves, time) VALUES (?, ?, ?)`,
+                [username, moveCount, Math.round(gameTime / 1000)],
+                () => console.log('Score saved successfully'),
+                (_, error) => console.log('Error saving score: ', error)
+            );
+        });
+    };
+
+    // Function to prompt the user for their username
+    const promptUsername = () => {
+        Alert.prompt(
+            'Enter Username',
+            'Please enter your username for the leaderboard:',
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Submit',
+                    onPress: (text) => {
+                        setUsername(text);
+                        saveScore(text);
+                    },
+                },
+            ],
+            'plain-text'
+        );
+    };
+
+    // Function to restart the game
     const restartGame = () => {
-        setCards(shuffleArray([...doubledEmojis]));
+        setCards(shuffleArray([...doubledEmojis])); // Reshuffle cards
         setOpenCards([]);
         setMatchedCards([]);
         setMoveCount(0);
+        setGameTime(0);
         setGameStarted(false);
+        setUsername('');
     };
 
+    // Handler for card press
     const onCardPress = async (index) => {
         if (!gameStarted) setGameStarted(true);
         if (openCards.length === 2 || openCards.includes(index) || matchedCards.includes(index)) return;
 
         Vibration.vibrate(); // Haptic feedback
-        await playSound(require('./assets/flip.mp3')); // Adjust the path as necessary
+        await playSound(require('./assets/flip.mp3'));
 
         const newOpenCards = [...openCards, index];
         setOpenCards(newOpenCards);
@@ -70,14 +110,15 @@ const MemoryGame = ({ onNavigate }) => {
                 setOpenCards([]);
                 if (matchedCards.length + 2 === cards.length) {
                     setGameStarted(false);
-                    Alert.alert("Congratulations!", `You've matched all pairs in ${Math.round(gameTime / 1000)} seconds with ${moveCount + 1} moves!`);
+                    promptUsername();
                 }
             } else {
-                setTimeout(() => setOpenCards([]), 1000);
+                setTimeout(() => setOpenCards([]), 500);
             }
         }
     };
 
+    // Function to render individual card
     const renderCard = (card, index) => {
         const isFlipped = openCards.includes(index) || matchedCards.includes(index);
         const isMatched = matchedCards.includes(index);
@@ -92,6 +133,7 @@ const MemoryGame = ({ onNavigate }) => {
         );
     };
 
+    // UI
     return (
         <View style={styles.fullScreen}>
             <View style={styles.container}>
@@ -116,34 +158,34 @@ const styles = StyleSheet.create({
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#d3d3d3', // Ensures the background covers the entire screen
+        backgroundColor: '#d3d3d3',
     },
     container: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        width: '100%', // Ensures the container uses the full screen width
+        width: '100%',
     },
     grid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         marginTop: 20,
-        justifyContent: 'center', // Align cards horizontally in the center
+        justifyContent: 'center',
     },
     card: {
         width: 80,
-        height: 100, // Increased height to resemble cards
+        height: 100,
         justifyContent: 'center',
         alignItems: 'center',
         margin: 5,
         backgroundColor: '#FAD02E',
-        borderRadius: 15, // Increased border radius for more rigid corners
+        borderRadius: 15,
     },
     matchedCard: {
         backgroundColor: 'lightgreen',
     },
     cardText: {
-        fontSize: 24, // Increased font size for better visibility
+        fontSize: 24,
     },
     timerText: {
         fontSize: 24,
